@@ -1,1 +1,150 @@
+generator client {
+  provider = "prisma-client-js"
+}
 
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  passwordHash  String
+  name          String
+  avatarUrl     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  workspaces    WorkspaceMember[]
+  tasks         TaskAssignment[]
+  comments      Comment[]
+  createdWorkspaces Workspace[] @relation("WorkspaceCreator")
+}
+
+model Workspace {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   String
+  creator     User     @relation("WorkspaceCreator", fields: [createdBy], references: [id])
+
+  members     WorkspaceMember[]
+  spaces      Space[]
+}
+
+model WorkspaceMember {
+  id          String   @id @default(uuid())
+  userId      String
+  workspaceId String
+  role        Role     @default(MEMBER)
+
+  user        User     @relation(fields: [userId], references: [id])
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+
+  @@unique([userId, workspaceId])
+}
+
+enum Role {
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+model Space {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  workspaceId String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  folders     Folder[]
+  lists       List[]
+}
+
+model Folder {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  spaceId     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  space       Space    @relation(fields: [spaceId], references: [id])
+  lists       List[]
+}
+
+model List {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  spaceId     String?
+  folderId    String?
+  position    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  space       Space?   @relation(fields: [spaceId], references: [id])
+  folder      Folder?  @relation(fields: [folderId], references: [id])
+  tasks       Task[]
+}
+
+model Task {
+  id              String   @id @default(uuid())
+  title           String
+  description     String?
+  status          String   @default("TODO")
+  priority        String?
+  dueDate         DateTime?
+  estimatedHours  Float?
+  listId          String
+  parentId        String?
+  position        Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  list            List     @relation(fields: [listId], references: [id])
+  parent          Task?    @relation("TaskHierarchy", fields: [parentId], references: [id])
+  subtasks        Task[]   @relation("TaskHierarchy")
+  assignees       TaskAssignment[]
+  comments        Comment[]
+}
+
+model TaskAssignment {
+  id      String @id @default(uuid())
+  taskId  String
+  userId  String
+
+  task    Task   @relation(fields: [taskId], references: [id])
+  user    User   @relation(fields: [userId], references: [id])
+
+  @@unique([taskId, userId])
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  content   String
+  taskId    String
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  task      Task     @relation(fields: [taskId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model ActivityLog {
+  id        String   @id @default(uuid())
+  taskId    String
+  userId    String
+  action    String
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  task      Task     @relation(fields: [taskId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+}
